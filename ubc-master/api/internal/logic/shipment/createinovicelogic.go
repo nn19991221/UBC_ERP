@@ -93,11 +93,13 @@ func (l *CreateInoviceLogic) CreateInovice(req *types.CreateInvoiceReq, w http.R
 	// 小计
 	table3Data = append(table3Data, utils.Table3Row{Description: "TOTAL AMOUNT", Qty: strconv.FormatInt(totalQty, 10), TotalUSD: subStr})
 
-	// Deposit
-	table3Data = append(table3Data, utils.Table3Row{
-		Description: "Deposit",
-		TotalUSD:    fmt.Sprintf("%.2f", req.Shipment.DepositAmt),
-	})
+	// Deposit (deduct from total)
+	if req.Shipment.DepositAmt > 0 {
+		table3Data = append(table3Data, utils.Table3Row{
+			Description: "Deposit",
+			TotalUSD:    fmt.Sprintf("-%.2f", req.Shipment.DepositAmt),
+		})
+	}
 
 	// 判断是否有附加费用
 	if req.Shipment.AdditionalCost > 0 && len(req.Shipment.AdditionalCostDescription) != 0 {
@@ -112,9 +114,9 @@ func (l *CreateInoviceLogic) CreateInovice(req *types.CreateInvoiceReq, w http.R
 		table3Data = append(table3Data, t)
 	}
 
-	totals := req.Invoice.SubTotal + req.Shipment.AdditionalCost + req.Shipment.DepositAmt
+	totals := req.Invoice.SubTotal + req.Shipment.AdditionalCost - req.Shipment.DepositAmt
 
-	subStr = fmt.Sprintf("%.2f", req.Invoice.SubTotal+req.Shipment.AdditionalCost+req.Shipment.DepositAmt)
+	subStr = fmt.Sprintf("%.2f", totals)
 
 	totalStr := fmt.Sprintf("%d", total)
 	cnStr := utils.ConvertFloatToWords(totals)
