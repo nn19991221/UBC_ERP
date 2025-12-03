@@ -1,0 +1,52 @@
+version: '3'
+
+networks:
+  backend:
+    driver: bridge
+  gateway:
+    external: true
+
+services:
+  ubc-api:
+    image: registry.us-west-1.aliyuncs.com/ubc/ubc:test
+    container_name: ubc
+    environment:
+      - TZ=Asia/Shanghai
+    privileged: true
+    volumes:
+      - ./etc/:/app/etc/
+    ports:
+      - "8888:8888"
+    stdin_open: true
+    tty: true
+    networks:
+      - gateway
+    restart: always
+
+
+  ubc-web:
+    container_name: ubc-web
+    image: registry.us-west-1.aliyuncs.com/ubc/ubc-web:test
+    environment:
+      - TZ=Asia/Shanghai
+    privileged: true
+    stdin_open: true
+    tty: true
+    ports:
+      - "18080:80"
+    networks:
+      - gateway
+    restart: always
+
+  mysql:
+    image: mysql
+    ports:
+      - "3306:3306"
+    environment:
+      - TZ=Asia/Shanghai
+      - MYSQL_ROOT_PASSWORD=y_1X%rspKkeAjhM#hW#J7f%!pKk1nh
+    volumes:
+      - /var/lib/ubc/mysql/data/mysql:/var/lib/mysql
+      - /var/lib/ubc/mysql/my_custom.cnf:/etc/mysql/conf.d/my_custom.cnf
+    networks:
+      - gateway
