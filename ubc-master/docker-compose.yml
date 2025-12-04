@@ -8,7 +8,9 @@ networks:
 
 services:
   ubc-api:
-    image: registry.us-west-1.aliyuncs.com/ubc/ubc:test
+    build:
+      context: ./api
+      dockerfile: Dockerfile
     container_name: ubc
     environment:
       - TZ=Asia/Shanghai
