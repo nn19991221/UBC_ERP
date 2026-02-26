@@ -43,6 +43,10 @@ func (l *CreateInoviceLogic) CreateInovice(req *types.CreateInvoiceReq, w http.R
 		l.Errorf("[CreateInvoice] update totalPsc and sub total err:%v", err)
 		return nil, xerr.CreateInvoiceErr
 	}
+	if err = invoice.FindByInvoiceCode(req.Invoice.InvoiceCode); err != nil {
+		l.Errorf("[CreateInvoice] query invoice by code err:%v", err)
+		return nil, xerr.CreateInvoiceErr
+	}
 
 	if len(req.Shipment.BillingContact) != 0 {
 		billTo = strings.Split(req.Shipment.BillingContact, "|")
@@ -88,18 +92,11 @@ func (l *CreateInoviceLogic) CreateInovice(req *types.CreateInvoiceReq, w http.R
 		totalQty += q
 	}
 
-	subStr := fmt.Sprintf("%.2f", req.Invoice.SubTotal)
+	totals := calculateInvoiceTotals(req.Invoice.SubTotal, 0, 0, 0, req.Shipment.AdditionalCost, invoice.ReceivedAmt)
+	subStr := fmt.Sprintf("%.2f", totals.GrandTotal)
 
 	// 小计
 	table3Data = append(table3Data, utils.Table3Row{Description: "TOTAL AMOUNT", Qty: strconv.FormatInt(totalQty, 10), TotalUSD: subStr})
-
-	// Deposit (deduct from total)
-	if req.Shipment.DepositAmt > 0 {
-		table3Data = append(table3Data, utils.Table3Row{
-			Description: "Deposit",
-			TotalUSD:    fmt.Sprintf("-%.2f", req.Shipment.DepositAmt),
-		})
-	}
 
 	// 判断是否有附加费用
 	if req.Shipment.AdditionalCost > 0 && len(req.Shipment.AdditionalCostDescription) != 0 {
@@ -114,15 +111,19 @@ func (l *CreateInoviceLogic) CreateInovice(req *types.CreateInvoiceReq, w http.R
 		table3Data = append(table3Data, t)
 	}
 
-	totals := req.Invoice.SubTotal + req.Shipment.AdditionalCost - req.Shipment.DepositAmt
-
-	subStr = fmt.Sprintf("%.2f", totals)
+	subStr = fmt.Sprintf("%.2f", totals.AmountDue)
 
 	totalStr := fmt.Sprintf("%d", total)
-	cnStr := utils.ConvertFloatToWords(totals)
+	cnStr := utils.ConvertFloatToWords(totals.AmountDue)
 	lastStr := fmt.Sprintf("TOTAL %d CTNS\n%s", req.Invoice.TotalCartons, cnStr)
+	totalSummary := utils.InvoiceTotalSummary{
+		GrandTotal: totals.GrandTotal,
+		Deposit:    totals.Deposit,
+		AmountDue:  totals.AmountDue,
+	}
+	fmt.Println("DEBUG Deposit:", totalSummary.Deposit)
 	pdfBuffer, err := utils.BuildInvoicePdf(table1Data, table2Data, table3Data, l.svcCtx.Config.Address, l.svcCtx.Config.Invoice,
-		invoiceOne, billTo, shipTo, lastStr, totalStr, subStr)
+		invoiceOne, billTo, shipTo, lastStr, totalStr, subStr, totalSummary)
 	if err != nil {
 		l.Errorf("[CreateInvoice] build pdf err:%v", err)
 		return nil, xerr.CreateInvoiceErr
@@ -137,4 +138,29 @@ func (l *CreateInoviceLogic) CreateInovice(req *types.CreateInvoiceReq, w http.R
 	}
 
 	return nil, nil
+}
+
+type invoiceTotals struct {
+	GrandTotal float64
+	Deposit    float64
+	AmountDue  float64
+}
+
+func calculateInvoiceTotals(subTotal, tax, shipping, discount, adjustments, depositAmt float64) invoiceTotals {
+	deposit := depositAmt
+	if deposit < 0 {
+		deposit = 0
+	}
+
+	grandTotal := subTotal + tax + shipping - discount + adjustments
+	amountDue := grandTotal - deposit
+	if amountDue < 0 {
+		amountDue = 0
+	}
+
+	return invoiceTotals{
+		GrandTotal: grandTotal,
+		Deposit:    deposit,
+		AmountDue:  amountDue,
+	}
 }

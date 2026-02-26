@@ -465,6 +465,10 @@ func (i *Invoice) FindById(invoiceId string) error {
 	return mysqlDb.Table("Invoice").Where("invoice_id = ?", invoiceId).First(&i).Error
 }
 
+func (i *Invoice) FindByInvoiceCode(invoiceCode string) error {
+	return mysqlDb.Table("Invoice").Where("invoice_code = ?", invoiceCode).First(&i).Error
+}
+
 func (i *Invoice) Remove(id string) error {
 	return mysqlDb.Table("Invoice").Delete(&Shipment{}, id).Error
 }
