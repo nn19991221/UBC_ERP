@@ -130,7 +130,15 @@ func (l *CreateInoviceLogic) CreateInovice(req *types.CreateInvoiceReq, w http.R
 	}
 
 	w.Header().Set("Content-Type", "application/pdf")
-	w.Header().Set("Content-Disposition", "inline; filename=invoice.pdf")
+	fileName := fmt.Sprintf("%s.pdf", invoice.InvoiceCode)
+	if invoice.InvoiceCode == "" {
+		fileName = "invoice.pdf"
+	}
+
+	w.Header().Set(
+		"Content-Disposition",
+		fmt.Sprintf("attachment; filename=\"%s\"", fileName),
+	)
 	_, err = w.Write(pdfBuffer.Bytes())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
