@@ -38,6 +38,12 @@ type Table3Row struct {
 	TotalUSD    string
 }
 
+type InvoiceTotalSummary struct {
+	GrandTotal float64
+	Deposit    float64
+	AmountDue  float64
+}
+
 var (
 	smallNumbers = []string{"", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"}
 	tens         = []string{"", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"}
@@ -105,7 +111,7 @@ func buildTitle(pdf *gofpdf.Fpdf, address, invoice, invoiceOne, billTo, shipTo [
 }
 
 // buildTable creates tables in the PDF with the given data
-func buildTable(pdf *gofpdf.Fpdf, table1Data []Table1Row, table2Data []Table2Row, table3Data []Table3Row, lastStr, totalStr, subStr string) {
+func buildTable(pdf *gofpdf.Fpdf, table1Data []Table1Row, table2Data []Table2Row, table3Data []Table3Row, lastStr, totalStr, subStr string, totalSummary InvoiceTotalSummary) {
 	// Table 1
 	pdf.SetX(20)
 	pdf.SetFont("Arial", "B", 5)
@@ -187,17 +193,37 @@ func buildTable(pdf *gofpdf.Fpdf, table1Data []Table1Row, table2Data []Table2Row
 		pdf.CellFormat(10, 4, row.TotalUSD, "R", 1, "R", false, 0, "")
 	}
 
-	// Add the total row within the same table, aligned with the columns
+	// Add the total rows within the same table, aligned with the columns
 	pdf.SetX(20)
 	pdf.SetFont("Arial", "B", 5)
-	// 添加最左边的表格框
+	// Grand total row
 	pdf.CellFormat(20, 4, "", "LT", 0, "C", false, 0, "")
 	pdf.CellFormat(100, 4, "", "T", 0, "C", false, 0, "")
-	pdf.CellFormat(20, 4, "AMOUNT DUE", "1", 0, "C", false, 0, "")
+	pdf.CellFormat(20, 4, "GRAND TOTAL", "1", 0, "C", false, 0, "")
 	pdf.CellFormat(10, 4, totalStr, "1", 0, "C", false, 0, "")
 	pdf.CellFormat(15, 4, "", "1", 0, "L", false, 0, "")
 	pdf.CellFormat(5, 4, "$", "LTB", 0, "L", false, 0, "")
-	pdf.CellFormat(10, 4, subStr, "RTB", 1, "R", false, 0, "")
+	pdf.CellFormat(10, 4, fmt.Sprintf("%.2f", totalSummary.GrandTotal), "RTB", 1, "R", false, 0, "")
+
+	// Deposit row
+	pdf.SetX(20)
+	pdf.CellFormat(20, 4, "", "L", 0, "C", false, 0, "")
+	pdf.CellFormat(100, 4, "", "", 0, "C", false, 0, "")
+	pdf.CellFormat(20, 4, "DEPOSIT", "1", 0, "C", false, 0, "")
+	pdf.CellFormat(10, 4, "", "1", 0, "C", false, 0, "")
+	pdf.CellFormat(15, 4, "", "1", 0, "L", false, 0, "")
+	pdf.CellFormat(5, 4, "$", "LTB", 0, "L", false, 0, "")
+	pdf.CellFormat(10, 4, fmt.Sprintf("%.2f", totalSummary.Deposit), "RTB", 1, "R", false, 0, "")
+
+	// Balance due row
+	pdf.SetX(20)
+	pdf.CellFormat(20, 4, "", "LT", 0, "C", false, 0, "")
+	pdf.CellFormat(100, 4, "", "T", 0, "C", false, 0, "")
+	pdf.CellFormat(20, 4, "BALANCE DUE", "1", 0, "C", false, 0, "")
+	pdf.CellFormat(10, 4, totalStr, "1", 0, "C", false, 0, "")
+	pdf.CellFormat(15, 4, "", "1", 0, "L", false, 0, "")
+	pdf.CellFormat(5, 4, "$", "LTB", 0, "L", false, 0, "")
+	pdf.CellFormat(10, 4, fmt.Sprintf("%.2f", totalSummary.AmountDue), "RTB", 1, "R", false, 0, "")
 
 	// Add a new table for the total cartons and total amount text with only the outer border
 	pdf.SetX(20)
@@ -264,7 +290,7 @@ func convertFloatToWords(amount float64) string {
 }
 
 func BuildInvoicePdf(table1Data []Table1Row, table2Data []Table2Row, table3Data []Table3Row,
-	address, invoice, invoiceOne, billTo, shipTo []string, lastStr, totalStr, subStr string) (*bytes.Buffer, error) {
+	address, invoice, invoiceOne, billTo, shipTo []string, lastStr, totalStr, subStr string, totalSummary InvoiceTotalSummary) (*bytes.Buffer, error) {
 
 	pdf := gofpdf.NewCustom(&gofpdf.InitType{
 		UnitStr: "mm",
@@ -276,7 +302,7 @@ func BuildInvoicePdf(table1Data []Table1Row, table2Data []Table2Row, table3Data 
 	buildTitle(pdf, address, invoice, invoiceOne, billTo, shipTo)
 	pdf.Ln(10)
 
-	buildTable(pdf, table1Data, table2Data, table3Data, lastStr, totalStr, subStr)
+	buildTable(pdf, table1Data, table2Data, table3Data, lastStr, totalStr, subStr, totalSummary)
 
 	// 将PDF内容写入字节缓冲区
 	var buf bytes.Buffer
