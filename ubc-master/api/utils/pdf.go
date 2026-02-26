@@ -209,7 +209,7 @@ func buildTable(pdf *gofpdf.Fpdf, table1Data []Table1Row, table2Data []Table2Row
 	pdf.SetX(20)
 	pdf.CellFormat(20, 4, "", "L", 0, "C", false, 0, "")
 	pdf.CellFormat(100, 4, "", "", 0, "C", false, 0, "")
-	pdf.CellFormat(20, 4, "DEPOSIT", "1", 0, "C", false, 0, "")
+	pdf.CellFormat(20, 4, "Deposit Paid", "1", 0, "C", false, 0, "")
 	pdf.CellFormat(10, 4, "", "1", 0, "C", false, 0, "")
 	pdf.CellFormat(15, 4, "", "1", 0, "L", false, 0, "")
 	pdf.CellFormat(5, 4, "$", "LTB", 0, "L", false, 0, "")

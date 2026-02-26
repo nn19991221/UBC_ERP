@@ -43,6 +43,10 @@ func (l *CreateInoviceLogic) CreateInovice(req *types.CreateInvoiceReq, w http.R
 		l.Errorf("[CreateInvoice] update totalPsc and sub total err:%v", err)
 		return nil, xerr.CreateInvoiceErr
 	}
+	if err = invoice.FindByInvoiceCode(req.Invoice.InvoiceCode); err != nil {
+		l.Errorf("[CreateInvoice] query invoice by code err:%v", err)
+		return nil, xerr.CreateInvoiceErr
+	}
 
 	if len(req.Shipment.BillingContact) != 0 {
 		billTo = strings.Split(req.Shipment.BillingContact, "|")
@@ -88,17 +92,11 @@ func (l *CreateInoviceLogic) CreateInovice(req *types.CreateInvoiceReq, w http.R
 		totalQty += q
 	}
 
-	totals := calculateInvoiceTotals(req.Invoice.SubTotal, req.Shipment.AdditionalCost, req.Shipment.DepositAmt)
+	totals := calculateInvoiceTotals(req.Invoice.SubTotal, 0, 0, 0, req.Shipment.AdditionalCost, invoice.ReceivedAmt)
 	subStr := fmt.Sprintf("%.2f", totals.GrandTotal)
 
 	// 小计
 	table3Data = append(table3Data, utils.Table3Row{Description: "TOTAL AMOUNT", Qty: strconv.FormatInt(totalQty, 10), TotalUSD: subStr})
-
-	// Deposit (deduct from total)
-	table3Data = append(table3Data, utils.Table3Row{
-		Description: "Deposit Paid",
-		TotalUSD:    fmt.Sprintf("-%.2f", totals.Deposit),
-	})
 
 	// 判断是否有附加费用
 	if req.Shipment.AdditionalCost > 0 && len(req.Shipment.AdditionalCostDescription) != 0 {
@@ -123,6 +121,7 @@ func (l *CreateInoviceLogic) CreateInovice(req *types.CreateInvoiceReq, w http.R
 		Deposit:    totals.Deposit,
 		AmountDue:  totals.AmountDue,
 	}
+	fmt.Println("DEBUG Deposit:", totalSummary.Deposit)
 	pdfBuffer, err := utils.BuildInvoicePdf(table1Data, table2Data, table3Data, l.svcCtx.Config.Address, l.svcCtx.Config.Invoice,
 		invoiceOne, billTo, shipTo, lastStr, totalStr, subStr, totalSummary)
 	if err != nil {
@@ -147,13 +146,13 @@ type invoiceTotals struct {
 	AmountDue  float64
 }
 
-func calculateInvoiceTotals(subTotal, additionalCost, depositAmt float64) invoiceTotals {
+func calculateInvoiceTotals(subTotal, tax, shipping, discount, adjustments, depositAmt float64) invoiceTotals {
 	deposit := depositAmt
 	if deposit < 0 {
 		deposit = 0
 	}
 
-	grandTotal := subTotal + additionalCost
+	grandTotal := subTotal + tax + shipping - discount + adjustments
 	amountDue := grandTotal - deposit
 	if amountDue < 0 {
 		amountDue = 0
